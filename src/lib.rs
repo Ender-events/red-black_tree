@@ -75,7 +75,7 @@ pub fn get_parent(node: &Node) -> Option<Rc<Node>> {
 /// assert!(red_black_tree::get_grandparent(&root).is_none());
 /// ```
 pub fn get_grandparent(node: &Node) -> Option<Rc<Node>> {
-    get_parent(node).and_then(|parent| get_parent(&*parent))
+    get_parent(node).and_then(|parent| get_parent(parent.as_ref()))
 }
 
 /// Return the sibling of the node
@@ -96,7 +96,7 @@ pub fn get_grandparent(node: &Node) -> Option<Rc<Node>> {
 /// assert!(red_black_tree::get_sibling(Rc::clone(&root)).is_none());
 /// ```
 pub fn get_sibling(node: Rc<Node>) -> Option<Rc<Node>> {
-    get_parent(&*node).and_then(|parent| {
+    get_parent(node.as_ref()).and_then(|parent| {
         parent
             .left
             .borrow()
@@ -110,6 +110,27 @@ pub fn get_sibling(node: Rc<Node>) -> Option<Rc<Node>> {
                 }
             })
     })
+}
+
+/// Return the uncle of the node
+/// ```
+/// use red_black_tree::{Node, COLOR};
+/// use std::rc::Rc;
+///
+/// let left_left = Node::new(0, None, None, COLOR::BLACK);
+/// let right_right = Node::new(40, None, None, COLOR::BLACK);
+/// let left = Node::new(10, Some(&left_left), None, COLOR::RED);
+/// let right = Node::new(30, None, Some(&right_right), COLOR::RED);
+/// let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+///
+/// assert!(Rc::ptr_eq(&right, &red_black_tree::get_uncle(Rc::clone(&left_left)).unwrap()));
+/// assert!(Rc::ptr_eq(&left, &red_black_tree::get_uncle(Rc::clone(&right_right)).unwrap()));
+/// assert!(red_black_tree::get_uncle(Rc::clone(&left)).is_none());
+/// assert!(red_black_tree::get_uncle(Rc::clone(&right)).is_none());
+/// assert!(red_black_tree::get_uncle(Rc::clone(&root)).is_none());
+/// ```
+pub fn get_uncle(node: Rc<Node>) -> Option<Rc<Node>> {
+    get_parent(node.as_ref()).and_then(|parent| get_sibling(Rc::clone(&parent)))
 }
 
 #[cfg(test)]
