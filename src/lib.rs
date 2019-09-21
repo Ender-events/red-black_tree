@@ -160,13 +160,40 @@ fn rotate_right(node: Rc<Node>) -> Rc<Node> {
     nroot
 }
 
+/// Perform a left rotation
+fn rotate_left(node: Rc<Node>) -> Rc<Node> {
+    let nroot = Rc::clone(node.right.borrow().as_ref().unwrap());
+    let parent = get_parent(node.as_ref());
+    *node.right.borrow_mut() = nroot
+        .left
+        .borrow()
+        .as_ref()
+        .and_then(|left| Some(Rc::clone(&left)));
+    *nroot.left.borrow_mut() = Some(Rc::clone(&node));
+    *node.parent.borrow_mut() = Rc::downgrade(&nroot);
+
+    if let Some(right) = node.right.borrow().as_ref() {
+        *right.parent.borrow_mut() = Rc::downgrade(&node);
+    }
+    if let Some(parent) = parent {
+        if let Some(left) = parent.left.borrow().as_ref() {
+            if Rc::ptr_eq(&left, &node) {
+                *parent.left.borrow_mut() = Some(Rc::clone(&nroot));
+            } else {
+                *parent.right.borrow_mut() = Some(Rc::clone(&nroot));
+            }
+        }
+    }
+    nroot
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn test_rotate_right() {
         let left_left = Node::new(0, None, None, COLOR::BLACK);
-        let left_right = Node::new(40, None, None, COLOR::BLACK);
+        let left_right = Node::new(15, None, None, COLOR::BLACK);
         let left = Node::new(10, Some(&left_left), Some(&left_right), COLOR::RED);
         let right = Node::new(30, None, None, COLOR::RED);
         let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
@@ -181,6 +208,32 @@ mod tests {
         ));
         assert!(Rc::ptr_eq(
             &left_right.parent.borrow().upgrade().unwrap(),
+            &root
+        ));
+        assert!(Rc::ptr_eq(
+            &root.parent.borrow().upgrade().unwrap(),
+            &nroot
+        ));
+    }
+
+    #[test]
+    fn test_rotate_left() {
+        let right_left = Node::new(25, None, None, COLOR::BLACK);
+        let right_right = Node::new(40, None, None, COLOR::BLACK);
+        let left = Node::new(10, None, None, COLOR::RED);
+        let right = Node::new(30, Some(&right_left), Some(&right_right), COLOR::RED);
+        let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+
+        let nroot = rotate_left(Rc::clone(&root));
+
+        assert!(Rc::ptr_eq(&nroot.left.borrow().as_ref().unwrap(), &root));
+        assert!(Rc::ptr_eq(&nroot, &right));
+        assert!(Rc::ptr_eq(
+            &root.right.borrow().as_ref().unwrap(),
+            &right_left
+        ));
+        assert!(Rc::ptr_eq(
+            &right_left.parent.borrow().upgrade().unwrap(),
             &root
         ));
         assert!(Rc::ptr_eq(
