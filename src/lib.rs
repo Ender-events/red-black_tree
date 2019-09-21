@@ -133,11 +133,59 @@ pub fn get_uncle(node: Rc<Node>) -> Option<Rc<Node>> {
     get_parent(node.as_ref()).and_then(|parent| get_sibling(Rc::clone(&parent)))
 }
 
+/// Perform a right rotation
+fn rotate_right(node: Rc<Node>) -> Rc<Node> {
+    let nroot = Rc::clone(node.left.borrow().as_ref().unwrap());
+    let parent = get_parent(node.as_ref());
+    *node.left.borrow_mut() = nroot
+        .right
+        .borrow()
+        .as_ref()
+        .and_then(|right| Some(Rc::clone(&right)));
+    *nroot.right.borrow_mut() = Some(Rc::clone(&node));
+    *node.parent.borrow_mut() = Rc::downgrade(&nroot);
+
+    if let Some(left) = node.left.borrow().as_ref() {
+        *left.parent.borrow_mut() = Rc::downgrade(&node);
+    }
+    if let Some(parent) = parent {
+        if let Some(left) = parent.left.borrow().as_ref() {
+            if Rc::ptr_eq(&left, &node) {
+                *parent.left.borrow_mut() = Some(Rc::clone(&nroot));
+            } else {
+                *parent.right.borrow_mut() = Some(Rc::clone(&nroot));
+            }
+        }
+    }
+    nroot
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn test_rotate_right() {
+        let left_left = Node::new(0, None, None, COLOR::BLACK);
+        let left_right = Node::new(40, None, None, COLOR::BLACK);
+        let left = Node::new(10, Some(&left_left), Some(&left_right), COLOR::RED);
+        let right = Node::new(30, None, None, COLOR::RED);
+        let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+
+        let nroot = rotate_right(Rc::clone(&root));
+
+        assert!(Rc::ptr_eq(&nroot.right.borrow().as_ref().unwrap(), &root));
+        assert!(Rc::ptr_eq(&nroot, &left));
+        assert!(Rc::ptr_eq(
+            &root.left.borrow().as_ref().unwrap(),
+            &left_right
+        ));
+        assert!(Rc::ptr_eq(
+            &left_right.parent.borrow().upgrade().unwrap(),
+            &root
+        ));
+        assert!(Rc::ptr_eq(
+            &root.parent.borrow().upgrade().unwrap(),
+            &nroot
+        ));
     }
 }
