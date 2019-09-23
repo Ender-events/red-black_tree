@@ -40,6 +40,54 @@ impl Node {
         }
         node
     }
+
+    pub fn valid(&self) -> bool {
+        self.is_black() && self.valid_rec().0
+    }
+
+    fn is_red(&self) -> bool {
+        match self.color {
+            COLOR::RED => true,
+            COLOR::BLACK => false,
+        }
+    }
+
+    fn is_black(&self) -> bool {
+        !self.is_red()
+    }
+
+    fn valid_rec(&self) -> (bool, u32) {
+        let (left_bool, left_black) = if let Some(left) = self.left.borrow().as_ref() {
+            left.valid_rec()
+        } else {
+            (true, 0)
+        };
+        let (right_bool, right_black) = if let Some(right) = self.right.borrow().as_ref() {
+            right.valid_rec()
+        } else {
+            (true, 0)
+        };
+        let color_child = if self.is_red() {
+            let left_color = if let Some(left) = self.left.borrow().as_ref() {
+                left.is_black()
+            } else {
+                true
+            };
+            let right_color = if let Some(right) = self.right.borrow().as_ref() {
+                right.is_black()
+            } else {
+                true
+            };
+            left_color && right_color
+        } else {
+            true
+        };
+
+        (
+            left_bool && right_bool && left_black == right_black && color_child,
+            left_black + self.is_black() as u32,
+        )
+    }
 }
 
 /// Return the parent of the node
@@ -54,6 +102,8 @@ impl Node {
 /// assert!(Rc::ptr_eq(&root, &red_black_tree::get_parent(&left).unwrap()));
 /// assert!(Rc::ptr_eq(&root, &red_black_tree::get_parent(&right).unwrap()));
 /// assert!(red_black_tree::get_parent(&root).is_none());
+///
+/// assert!(root.valid());
 /// ```
 pub fn get_parent(node: &Node) -> Option<Rc<Node>> {
     node.parent.borrow().upgrade()
@@ -73,6 +123,8 @@ pub fn get_parent(node: &Node) -> Option<Rc<Node>> {
 /// assert!(red_black_tree::get_grandparent(&left).is_none());
 /// assert!(red_black_tree::get_grandparent(&right).is_none());
 /// assert!(red_black_tree::get_grandparent(&root).is_none());
+///
+/// assert!(!root.valid());
 /// ```
 pub fn get_grandparent(node: &Node) -> Option<Rc<Node>> {
     get_parent(node).and_then(|parent| get_parent(parent.as_ref()))
@@ -83,10 +135,10 @@ pub fn get_grandparent(node: &Node) -> Option<Rc<Node>> {
 /// use red_black_tree::{Node, COLOR};
 /// use std::rc::Rc;
 ///
-/// let left_left = Node::new(0, None, None, COLOR::BLACK);
-/// let right_right = Node::new(40, None, None, COLOR::BLACK);
-/// let left = Node::new(10, Some(&left_left), None, COLOR::RED);
-/// let right = Node::new(30, None, Some(&right_right), COLOR::RED);
+/// let left_left = Node::new(0, None, None, COLOR::RED);
+/// let right_right = Node::new(40, None, None, COLOR::RED);
+/// let left = Node::new(10, Some(&left_left), None, COLOR::BLACK);
+/// let right = Node::new(30, None, Some(&right_right), COLOR::BLACK);
 /// let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
 ///
 /// assert!(Rc::ptr_eq(&right, &red_black_tree::get_sibling(Rc::clone(&left)).unwrap()));
@@ -94,6 +146,8 @@ pub fn get_grandparent(node: &Node) -> Option<Rc<Node>> {
 /// assert!(red_black_tree::get_sibling(Rc::clone(&left_left)).is_none());
 /// assert!(red_black_tree::get_sibling(Rc::clone(&right_right)).is_none());
 /// assert!(red_black_tree::get_sibling(Rc::clone(&root)).is_none());
+///
+/// assert!(root.valid());
 /// ```
 pub fn get_sibling(node: Rc<Node>) -> Option<Rc<Node>> {
     get_parent(node.as_ref()).and_then(|parent| {
@@ -128,6 +182,8 @@ pub fn get_sibling(node: Rc<Node>) -> Option<Rc<Node>> {
 /// assert!(red_black_tree::get_uncle(Rc::clone(&left)).is_none());
 /// assert!(red_black_tree::get_uncle(Rc::clone(&right)).is_none());
 /// assert!(red_black_tree::get_uncle(Rc::clone(&root)).is_none());
+///
+/// assert!(!root.valid());
 /// ```
 pub fn get_uncle(node: Rc<Node>) -> Option<Rc<Node>> {
     get_parent(node.as_ref()).and_then(|parent| get_sibling(Rc::clone(&parent)))
@@ -198,6 +254,8 @@ mod tests {
         let right = Node::new(30, None, None, COLOR::RED);
         let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
 
+        assert!(!root.valid());
+
         let nroot = rotate_right(Rc::clone(&root));
 
         assert!(Rc::ptr_eq(&nroot.right.borrow().as_ref().unwrap(), &root));
@@ -210,10 +268,7 @@ mod tests {
             &left_right.parent.borrow().upgrade().unwrap(),
             &root
         ));
-        assert!(Rc::ptr_eq(
-            &root.parent.borrow().upgrade().unwrap(),
-            &nroot
-        ));
+        assert!(Rc::ptr_eq(&root.parent.borrow().upgrade().unwrap(), &nroot));
     }
 
     #[test]
@@ -223,6 +278,8 @@ mod tests {
         let left = Node::new(10, None, None, COLOR::RED);
         let right = Node::new(30, Some(&right_left), Some(&right_right), COLOR::RED);
         let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+
+        assert!(!root.valid());
 
         let nroot = rotate_left(Rc::clone(&root));
 
@@ -236,9 +293,29 @@ mod tests {
             &right_left.parent.borrow().upgrade().unwrap(),
             &root
         ));
-        assert!(Rc::ptr_eq(
-            &root.parent.borrow().upgrade().unwrap(),
-            &nroot
-        ));
+        assert!(Rc::ptr_eq(&root.parent.borrow().upgrade().unwrap(), &nroot));
+    }
+
+    #[test]
+    fn test_valid() {
+        let left_left = Node::new(0, None, None, COLOR::BLACK);
+        let left_right = Node::new(15, None, None, COLOR::BLACK);
+        let right_left = Node::new(25, None, None, COLOR::BLACK);
+        let right_right = Node::new(40, None, None, COLOR::BLACK);
+        let left = Node::new(10, Some(&left_left), Some(&left_right), COLOR::RED);
+        let right = Node::new(30, Some(&right_left), Some(&right_right), COLOR::RED);
+        let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+
+        assert!(root.valid());
+    }
+
+    #[test]
+    fn test_invalid_color() {
+        let left_left = Node::new(0, None, None, COLOR::RED);
+        let left = Node::new(10, Some(&left_left), None, COLOR::RED);
+        let right = Node::new(30, None, None, COLOR::RED);
+        let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
+
+        assert!(!root.valid());
     }
 }
