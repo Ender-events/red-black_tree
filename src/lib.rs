@@ -13,7 +13,7 @@ pub struct Node {
     parent: RefCell<Weak<Node>>,
     left: RefCell<Option<Rc<Node>>>,
     right: RefCell<Option<Rc<Node>>>,
-    color: COLOR,
+    color: RefCell<COLOR>,
 }
 
 impl Node {
@@ -28,7 +28,7 @@ impl Node {
             parent: RefCell::new(Weak::new()),
             left: RefCell::new(None),
             right: RefCell::new(None),
-            color,
+            color: RefCell::new(color),
         });
         if let Some(left) = left {
             *left.parent.borrow_mut() = Rc::downgrade(&node);
@@ -46,7 +46,7 @@ impl Node {
     }
 
     fn is_red(&self) -> bool {
-        match self.color {
+        match *self.color.borrow() {
             COLOR::RED => true,
             COLOR::BLACK => false,
         }
@@ -247,6 +247,7 @@ fn rotate_left(node: Rc<Node>) -> Rc<Node> {
 pub fn insert(root: Rc<Node>, key: i32) -> Rc<Node> {
     let node = Node::new(key, None, None, COLOR::RED);
     insert_rec(root, Rc::clone(&node));
+    insert_repair(Rc::clone(&node));
     let mut nroot = node;
     while let Some(parent) = get_parent(&nroot) {
         nroot = parent;
@@ -273,6 +274,25 @@ fn insert_rec(root: Rc<Node>, node: Rc<Node>) {
         }
     }
     *node.parent.borrow_mut() = Rc::downgrade(&root);
+}
+
+fn insert_repair(node: Rc<Node>) {
+    if get_parent(node.as_ref()).unwrap().is_black() {
+
+    } else if let Some(uncle) = get_uncle(Rc::clone(&node)) {
+        if uncle.is_red() {
+            insert_repair_color(node);
+        }
+    } else {
+        unimplemented!();
+    }
+}
+
+fn insert_repair_color(node: Rc<Node>) {
+    *get_parent(node.as_ref()).unwrap().color.borrow_mut() = COLOR::BLACK;
+    *get_uncle(Rc::clone(&node)).unwrap().color.borrow_mut() = COLOR::BLACK;
+    *get_grandparent(node.as_ref()).unwrap().color.borrow_mut() = COLOR::BLACK;
+    insert_repair(node);
 }
 
 #[cfg(test)]
@@ -361,5 +381,21 @@ mod tests {
         assert!(Rc::ptr_eq(&root, &nroot));
         assert!(root.left.borrow().as_ref().unwrap().key == 10);
         assert!(root.right.borrow().as_ref().unwrap().key == 30);
+        assert!(root.left.borrow().as_ref().unwrap().is_red());
+        assert!(root.right.borrow().as_ref().unwrap().is_red());
+    }
+
+    #[test]
+    fn test_insert_color() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        insert(Rc::clone(&root), 30);
+        insert(Rc::clone(&root), 0);
+        let nroot = insert(Rc::clone(&root), 35);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.left.borrow().as_ref().unwrap().is_black());
+        assert!(root.right.borrow().as_ref().unwrap().is_black());
     }
 }
