@@ -243,6 +243,38 @@ fn rotate_left(node: Rc<Node>) -> Rc<Node> {
     nroot
 }
 
+/// Insert a value in the tree
+pub fn insert(root: Rc<Node>, key: i32) -> Rc<Node> {
+    let node = Node::new(key, None, None, COLOR::RED);
+    insert_rec(root, Rc::clone(&node));
+    let mut nroot = node;
+    while let Some(parent) = get_parent(&nroot) {
+        nroot = parent;
+    }
+    nroot
+}
+
+fn insert_rec(root: Rc<Node>, node: Rc<Node>) {
+    if node.key < root.key {
+        let mut left = root.left.borrow_mut();
+        if let Some(left) = left.as_ref() {
+            insert_rec(Rc::clone(&left), Rc::clone(&node));
+            return;
+        } else {
+            *left = Some(Rc::clone(&node));
+        }
+    } else {
+        let mut right = root.right.borrow_mut();
+        if let Some(right) = right.as_ref() {
+            insert_rec(Rc::clone(&right), Rc::clone(&node));
+            return;
+        } else {
+            *right = Some(Rc::clone(&node));
+        }
+    }
+    *node.parent.borrow_mut() = Rc::downgrade(&root);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +349,17 @@ mod tests {
         let root = Node::new(20, Some(&left), Some(&right), COLOR::BLACK);
 
         assert!(!root.valid());
+    }
+
+    #[test]
+    fn test_simple_insert() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        let nroot = insert(Rc::clone(&root), 30);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.left.borrow().as_ref().unwrap().key == 10);
+        assert!(root.right.borrow().as_ref().unwrap().key == 30);
     }
 }
