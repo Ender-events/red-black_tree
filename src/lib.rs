@@ -1,6 +1,7 @@
 #![crate_name = "red_black_tree"]
 
 use std::cell::RefCell;
+use std::option::Option;
 use std::rc::{Rc, Weak};
 
 pub enum COLOR {
@@ -204,15 +205,7 @@ fn rotate_right(node: Rc<Node>) -> Rc<Node> {
     if let Some(left) = node.left.borrow().as_ref() {
         *left.parent.borrow_mut() = Rc::downgrade(&node);
     }
-    if let Some(parent) = parent {
-        if let Some(left) = parent.left.borrow().as_ref() {
-            if Rc::ptr_eq(&left, &node) {
-                *parent.left.borrow_mut() = Some(Rc::clone(&nroot));
-            } else {
-                *parent.right.borrow_mut() = Some(Rc::clone(&nroot));
-            }
-        }
-    }
+    rotate_update_parent(&node, &parent, &nroot);
     nroot
 }
 
@@ -231,16 +224,28 @@ fn rotate_left(node: Rc<Node>) -> Rc<Node> {
     if let Some(right) = node.right.borrow().as_ref() {
         *right.parent.borrow_mut() = Rc::downgrade(&node);
     }
-    if let Some(parent) = parent {
-        if let Some(left) = parent.left.borrow().as_ref() {
-            if Rc::ptr_eq(&left, &node) {
-                *parent.left.borrow_mut() = Some(Rc::clone(&nroot));
-            } else {
-                *parent.right.borrow_mut() = Some(Rc::clone(&nroot));
-            }
-        }
-    }
+    rotate_update_parent(&node, &parent, &nroot);
     nroot
+}
+
+/// update Some(parent) after rotate
+fn rotate_update_parent(node: &Rc<Node>, parent: &Option<Rc<Node>>, nroot: &Rc<Node>) {
+    if let Some(parent) = parent {
+        if parent
+            .left
+            .borrow()
+            .as_ref()
+            .filter(|left| Rc::ptr_eq(&left, &node))
+            .is_some()
+        {
+            *parent.left.borrow_mut() = Some(Rc::clone(&nroot));
+        } else {
+            *parent.right.borrow_mut() = Some(Rc::clone(&nroot));
+        }
+        *nroot.parent.borrow_mut() = Rc::downgrade(&parent);
+    } else {
+        *nroot.parent.borrow_mut() = Weak::new();
+    }
 }
 
 /// Insert a value in the tree
@@ -284,7 +289,7 @@ fn insert_repair(node: Rc<Node>) {
             insert_repair_color(node);
         }
     } else {
-        unimplemented!();
+        insert_repair_first_rotate(node);
     }
 }
 
@@ -293,6 +298,65 @@ fn insert_repair_color(node: Rc<Node>) {
     *get_uncle(Rc::clone(&node)).unwrap().color.borrow_mut() = COLOR::BLACK;
     *get_grandparent(node.as_ref()).unwrap().color.borrow_mut() = COLOR::BLACK;
     insert_repair(node);
+}
+
+fn insert_repair_first_rotate(node: Rc<Node>) {
+    let parent = get_parent(node.as_ref()).unwrap();
+    let grandparent = get_grandparent(node.as_ref()).unwrap();
+    let node = if parent
+        .right
+        .borrow()
+        .as_ref()
+        .filter(|right| Rc::ptr_eq(&right, &node))
+        .and(
+            grandparent
+                .left
+                .borrow()
+                .as_ref()
+                .filter(|left| Rc::ptr_eq(&left, &node)),
+        )
+        .is_some()
+    {
+        rotate_left(Rc::clone(&node));
+        Rc::clone(node.left.borrow().as_ref().unwrap())
+    } else if parent
+        .left
+        .borrow()
+        .as_ref()
+        .filter(|left| Rc::ptr_eq(&left, &node))
+        .and(
+            grandparent
+                .right
+                .borrow()
+                .as_ref()
+                .filter(|right| Rc::ptr_eq(&right, &node)),
+        )
+        .is_some()
+    {
+        rotate_right(Rc::clone(&node));
+        Rc::clone(node.right.borrow().as_ref().unwrap())
+    } else {
+        node
+    };
+    insert_repair_second_rotate(node)
+}
+
+fn insert_repair_second_rotate(node: Rc<Node>) {
+    let parent = get_parent(node.as_ref()).unwrap();
+    let grandparent = get_grandparent(node.as_ref()).unwrap();
+    if parent
+        .left
+        .borrow()
+        .as_ref()
+        .filter(|left| Rc::ptr_eq(&left, &node))
+        .is_some()
+    {
+        rotate_right(Rc::clone(&grandparent));
+    } else {
+        rotate_left(Rc::clone(&grandparent));
+    }
+    *parent.color.borrow_mut() = COLOR::BLACK;
+    *grandparent.color.borrow_mut() = COLOR::RED;
 }
 
 #[cfg(test)]
@@ -395,6 +459,36 @@ mod tests {
 
         assert!(root.valid());
         assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.left.borrow().as_ref().unwrap().is_black());
+        assert!(root.right.borrow().as_ref().unwrap().is_black());
+    }
+
+    #[test]
+    fn test_insert_left_rotation() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        insert(Rc::clone(&root), 30);
+        insert(Rc::clone(&root), 15);
+        let nroot = insert(Rc::clone(&root), 18);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.left.borrow().as_ref().unwrap().key == 15);
+        assert!(root.left.borrow().as_ref().unwrap().is_black());
+        assert!(root.right.borrow().as_ref().unwrap().is_black());
+    }
+
+    #[test]
+    fn test_insert_right_rotation() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        insert(Rc::clone(&root), 30);
+        insert(Rc::clone(&root), 25);
+        let nroot = insert(Rc::clone(&root), 22);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.right.borrow().as_ref().unwrap().key == 25);
         assert!(root.left.borrow().as_ref().unwrap().is_black());
         assert!(root.right.borrow().as_ref().unwrap().is_black());
     }
