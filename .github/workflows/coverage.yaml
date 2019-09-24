@@ -1,0 +1,29 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  coverage:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build and run tests
+      env:
+        CARGO_INCREMENTAL: 0
+        RUSTFLAGS: -Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads
+      run: |
+        rustup install nightly
+        cargo +nightly build --verbose
+        cargo +nightly test --verbose 
+
+    - name: Create lcov and upload
+      env:
+        PROJECT_NAME: red_black_tree
+        CODECOV_TOKEN: ${{ secrets. CODECOV_TOKEN }}
+      run: |
+        cargo install grcov
+        zip -0 ccov.zip $(find -name "${PROJECT_NAME}*.gc*" -print)
+        grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" -o lcov.info
+        bash <(curl -s https://codecov.io/bash) -f lcov.info
