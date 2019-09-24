@@ -313,11 +313,11 @@ fn insert_repair_first_rotate(node: Rc<Node>) {
                 .left
                 .borrow()
                 .as_ref()
-                .filter(|left| Rc::ptr_eq(&left, &node)),
+                .filter(|left| Rc::ptr_eq(&left, &parent)),
         )
         .is_some()
     {
-        rotate_left(Rc::clone(&node));
+        rotate_left(Rc::clone(&parent));
         Rc::clone(node.left.borrow().as_ref().unwrap())
     } else if parent
         .left
@@ -329,11 +329,11 @@ fn insert_repair_first_rotate(node: Rc<Node>) {
                 .right
                 .borrow()
                 .as_ref()
-                .filter(|right| Rc::ptr_eq(&right, &node)),
+                .filter(|right| Rc::ptr_eq(&right, &parent)),
         )
         .is_some()
     {
-        rotate_right(Rc::clone(&node));
+        rotate_right(Rc::clone(&parent));
         Rc::clone(node.right.borrow().as_ref().unwrap())
     } else {
         node
@@ -489,6 +489,36 @@ mod tests {
         assert!(root.valid());
         assert!(Rc::ptr_eq(&root, &nroot));
         assert!(root.right.borrow().as_ref().unwrap().key == 25);
+        assert!(root.left.borrow().as_ref().unwrap().is_black());
+        assert!(root.right.borrow().as_ref().unwrap().is_black());
+    }
+
+    #[test]
+    fn test_insert_left_right_rotation() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        insert(Rc::clone(&root), 30);
+        insert(Rc::clone(&root), 25);
+        let nroot = insert(Rc::clone(&root), 28);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.right.borrow().as_ref().unwrap().key == 28);
+        assert!(root.left.borrow().as_ref().unwrap().is_black());
+        assert!(root.right.borrow().as_ref().unwrap().is_black());
+    }
+
+    #[test]
+    fn test_insert_right_left_rotation() {
+        let root = Node::new(20, None, None, COLOR::BLACK);
+        insert(Rc::clone(&root), 10);
+        insert(Rc::clone(&root), 30);
+        insert(Rc::clone(&root), 15);
+        let nroot = insert(Rc::clone(&root), 12);
+
+        assert!(root.valid());
+        assert!(Rc::ptr_eq(&root, &nroot));
+        assert!(root.left.borrow().as_ref().unwrap().key == 12);
         assert!(root.left.borrow().as_ref().unwrap().is_black());
         assert!(root.right.borrow().as_ref().unwrap().is_black());
     }
