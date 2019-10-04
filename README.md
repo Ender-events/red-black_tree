@@ -1,6 +1,6 @@
 # Red-black tree in Rust
 
-![](https://github.com/Ender-events/red-black_tree/workflows/Rust/badge.svg)
+![](https://github.com/Ender-events/red-black_tree/workflows/Rust%20test/badge.svg)
 [![codecov](https://codecov.io/gh/Ender-events/red-black_tree/branch/master/graph/badge.svg)](https://codecov.io/gh/Ender-events/red-black_tree)
 
 A WIP implementation of red-black tree.  

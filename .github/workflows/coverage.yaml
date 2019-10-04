@@ -1,29 +1,39 @@
-name: Rust
+name: Rust coverage
 
-on: [push]
+on:
+  push:
+    paths:
+      - 'src/*'
+      - '.github/workflows/coverage.yaml'
+
+    branchs:
+      - master
+  
+  pull_request:
+    types: ["opened", "ready_for_review", "review_requested"]
+    paths:
+      - 'src/*'
 
 jobs:
   coverage:
 
     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v1
-    - name: Build and run tests
-      env:
-        CARGO_INCREMENTAL: 0
-        RUSTFLAGS: -Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads
-      run: |
-        rustup install nightly
-        cargo +nightly build --verbose
-        cargo +nightly test --verbose 
-
-    - name: Create lcov and upload
+    container:
+      image: enderevents/grcov
       env:
         PROJECT_NAME: red_black_tree
-        CODECOV_TOKEN: ${{ secrets. CODECOV_TOKEN }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Generate lcov
       run: |
-        cargo install grcov
-        zip -0 ccov.zip $(find -name "${PROJECT_NAME}*.gc*" -print)
-        grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore-dir "/*" -o lcov.info
-        bash <(curl -s https://codecov.io/bash) -f lcov.info
+        mkdir -p /output
+        /coverage.sh
+    - name: Upload lcov to codecov.io
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      run: |
+        curl -s https://codecov.io/bash > codecov.sh
+        chmod +x codecov.sh
+        ./codecov.sh -f /output/lcov.info

@@ -1,6 +1,10 @@
-name: Rust
+name: Rust test
 
-on: [push]
+on:
+  push:
+    paths:
+      - 'src/*'
+      - '.github/workflows/rust.yml'
 
 jobs:
   build:
